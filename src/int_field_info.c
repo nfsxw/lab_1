@@ -1,4 +1,5 @@
 #include "int_field_info.h"
+#include "errors_handling.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -46,7 +47,7 @@ field_info_t *get_int_field_info(void)
         if (!int_field_info) {
                 int_field_info = malloc(sizeof(field_info_t));
                 if (!int_field_info)
-                        return NULL;
+                	LOG_FATAL("%s", error_str(ERR_NO_MEM));
                 int_field_info->elem_size = sizeof(int);
                 int_field_info->print = print_int;
                 int_field_info->compare = compare_ints;

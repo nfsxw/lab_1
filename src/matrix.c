@@ -156,14 +156,18 @@ matrix_t *matrix_multiply(const matrix_t *a, const matrix_t *b)
 		return NULL; 
 	}
 
-
 	matrix_t *result = matrix_create(a->field_info, a->size);
 	if (!result) {
 		LOG_ERROR("%s from result.", error_str(ERR_NULL_PTR));
 		return NULL;
 	}
 	
-	char temp[a->field_info->elem_size];
+	char *temp = malloc(a->field_info->elem_size);
+	if(!temp) {
+		matrix_free(result);
+		LOG_ERROR("%s.", error_str(ERR_NO_MEM));
+		return NULL;
+	}
 	void *ptr_a, *ptr_b, *ptr_res;
 
 	for (size_t i = 0; i < a->size; i++) {
@@ -178,6 +182,7 @@ matrix_t *matrix_multiply(const matrix_t *a, const matrix_t *b)
 			}
 		}
 	}
+	free(temp);
 	return result;
 }
 
@@ -257,7 +262,13 @@ matrix_t *matrix_add_linear_combination(const matrix_t *source,
 		const void* coeff = (const char*)coefficients + i *
 						 source->field_info->elem_size;
 		void *src_elem, *res_elem;
-		char temp[source->field_info->elem_size];
+	
+		char *temp = malloc(source->field_info->elem_size);
+		if(!temp) {
+			matrix_free(result);
+			LOG_ERROR("%s.", error_str(ERR_NO_MEM));
+			return NULL;
+		}
 
 		for (size_t j = 0; j < source->size; j++) {
 			src_elem = matrix_get(source, src_row, j);
@@ -266,8 +277,7 @@ matrix_t *matrix_add_linear_combination(const matrix_t *source,
 			source->field_info->scalar_mul(src_elem, coeff, temp);
 			source->field_info->add(res_elem, temp, res_elem);
 		}
+		free(temp);
 	}
 	return result;
 }
-
-

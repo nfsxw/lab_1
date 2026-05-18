@@ -9,6 +9,8 @@ add_executable (
     lab_1
     src/matrix.c
     src/int_field_info.c
+    src/errors_handling.c
+    src/menu.c
     main.c
 )
 

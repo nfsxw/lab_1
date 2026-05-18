@@ -58,7 +58,8 @@ void *matrix_get(const matrix_t *matrix, size_t row, size_t col)
 	return base + (index * matrix->field_info->elem_size);
 }
 
-error_code_t matrix_set(matrix_t *matrix, size_t row, size_t col, const void *value)
+error_code_t matrix_set(matrix_t *matrix, size_t row, size_t col,
+						const void *value)
 {
 	if(!matrix) {
 		LOG_ERROR("%s from matrix.", error_str(ERR_NULL_PTR));

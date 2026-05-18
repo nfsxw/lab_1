@@ -3,11 +3,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static int compare_ints(const void *a, const void *b)
+static int compare_int(const void *a, const void *b)
 {
         const int *a_val = (const int *)a;
         const int *b_val = (const int *)b;
-        return *a_val - *b_val;
+        if (*a_val < *b_val)
+		return -1;
+        if (*a_val > *b_val)
+		return 1;
+        return 0;
 }
 
 static void print_int(const void *elem)
@@ -15,7 +19,7 @@ static void print_int(const void *elem)
         printf("%d", *(const int *)elem);
 }
 
-static void add_ints(const void *a, const void *b, void *result)
+static void add_int(const void *a, const void *b, void *result)
 {
         const int *a_val = (const int *)a;
         const int *b_val = (const int *)b;
@@ -23,7 +27,7 @@ static void add_ints(const void *a, const void *b, void *result)
         *res_val = *a_val + *b_val;
 }
 
-static void multiply_ints(const void *a, const void *b, void *result)
+static void multiply_int(const void *a, const void *b, void *result)
 {
         const int *a_val = (const int *)a;
         const int *b_val = (const int *)b;
@@ -50,9 +54,9 @@ field_info_t *get_int_field_info(void)
                 	LOG_FATAL("%s", error_str(ERR_NO_MEM));
                 int_field_info->elem_size = sizeof(int);
                 int_field_info->print = print_int;
-                int_field_info->compare = compare_ints;
-                int_field_info->add = add_ints;
-                int_field_info->multiply = multiply_ints;
+                int_field_info->compare = compare_int;
+                int_field_info->add = add_int;
+                int_field_info->multiply = multiply_int;
                 int_field_info->scalar_mul = scalar_mul_int;
         }
         return int_field_info;

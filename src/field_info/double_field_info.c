@@ -35,7 +35,8 @@ static void multiply_double(const void *a, const void *b, void *result)
         *res_val = *a_val * *b_val;
 }
 
-static void scalar_mul_double(const void *elem, const void *scalar, void *result)
+static void scalar_mul_double(const void *elem, const void *scalar,
+						      void *result)
 {
         const double *elem_val = (const double *)elem;
         const double *scalar_val = (const double *)scalar;

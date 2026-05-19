@@ -1,4 +1,5 @@
 #include "errors_handling.h"
+
 const char *error_str(error_code_t code)
 {
 	switch(code) {

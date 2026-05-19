@@ -51,7 +51,7 @@ field_info_t *get_int_field_info(void)
         if (!int_field_info) {
                 int_field_info = malloc(sizeof(field_info_t));
                 if (!int_field_info)
-                	LOG_FATAL("%s", error_str(ERR_NO_MEM));
+                	LOG_FATAL("%s.", error_str(ERR_NO_MEM));
                 int_field_info->elem_size = sizeof(int);
                 int_field_info->print = print_int;
                 int_field_info->compare = compare_int;

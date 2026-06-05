@@ -10,8 +10,6 @@ typedef struct field_info_t
 	void (*print)(const void *elem);
 	void (*add)(const void *a, const void *b, void *result);
 	void (*multiply)(const void *a, const void *b, void *result);
-	void (*scalar_mul)(const void *elem, const void *scalar, void *result);
-
 } field_info_t;
 
 #endif

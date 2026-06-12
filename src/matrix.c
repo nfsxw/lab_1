@@ -194,27 +194,17 @@ matrix_t *matrix_scalar_mul(const matrix_t *matrix, const void *scalar)
     matrix_t *result = matrix_create(matrix->field_info, matrix->size);
     if (!result) return NULL;
 
-    char *temp = malloc(matrix->field_info->elem_size);
-    if (!temp) {
-        matrix_free(result);
-        LOG_ERROR("%s.", error_str(ERR_NO_MEM));
-        return NULL;
-    }
-
     for (size_t i = 0; i < matrix->size; i++) {
         for (size_t j = 0; j < matrix->size; j++) {
             void *elem = matrix_get(matrix, i, j);
             void *res_elem = matrix_get(result, i, j);
             if (!elem || !res_elem) {
-                free(temp);
                 matrix_free(result);
                 return NULL;
             }
-            matrix->field_info->multiply(elem, scalar, temp);
-            memcpy(res_elem, temp, matrix->field_info->elem_size);
+            matrix->field_info->multiply(elem, scalar, res_elem);
         }
     }
-    free(temp);
     return result;
 }
 

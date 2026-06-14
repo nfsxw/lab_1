@@ -102,7 +102,7 @@ static void test_int_scalar_mul()
             matrix_set(m, i, j, &data[i][j]);
     int scalar = 3;
     matrix_t *res = matrix_scalar_mul(m, &scalar);
-    int expected[2][2] = {{1000,6},{9,12}};
+    int expected[2][2] = {{3,6},{9,12}};  // ИСПРАВЛЕНО: 1000 → 3
     int ok = 1;
     for (int i=0; i<2 && ok; i++)
         for (int j=0; j<2; j++) {

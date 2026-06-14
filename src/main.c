@@ -25,9 +25,9 @@ static void clear_screen()
 
 static void wait_for_enter()
 {
-    char buffer[2];
     printf("\nPress Enter to continue...");
-    fgets(buffer, sizeof(buffer), stdin);
+    fflush(stdout);
+    getchar();
 }
 
 static void show_available_matrices()
@@ -59,6 +59,12 @@ static int read_int_range(const char *prompt, int min, int max, int *value)
             printf("Error: please enter an integer between %d and %d.\n", min, max);
             continue;
         }
+        while (*endptr == ' ' || *endptr == '\t' || *endptr == '\n')
+            endptr++;
+        if (*endptr != '\0') {
+            printf("Error: please enter an integer without extra characters.\n");
+            continue;
+        }
         *value = (int)val;
         return 1;
     }
@@ -87,6 +93,12 @@ static int read_double_range(const char *prompt, double *value)
             printf("Error: please enter a valid number.\n");
             continue;
         }
+        while (*endptr == ' ' || *endptr == '\t' || *endptr == '\n')
+            endptr++;
+        if (*endptr != '\0') {
+            printf("Error: please enter a number without extra characters.\n");
+            continue;
+        }
         *value = val;
         return 1;
     }
@@ -102,53 +114,60 @@ static int any_matrix_exists()
 static int read_matrix_elements(matrix_t *mat, int type)
 {
     size_t total = mat->size * mat->size;
-    size_t read_count = 0;
-    char buffer[4096];
-    int int_val;
-    double dbl_val;
-
-    printf("Enter %zu elements (space-separated, you may use multiple lines):\n", total);
-    while (read_count < total) {
-        if (!fgets(buffer, sizeof(buffer), stdin)) {
-            printf("Unexpected end of input.\n");
-            return 0;
-        }
-        char *ptr = buffer;
-        while (read_count < total) {
-            while (*ptr == ' ' || *ptr == '\t') ptr++;
-            if (*ptr == '\0' || *ptr == '\n') break;
-
-            char *endptr;
-            if (type == 1) {
-                errno = 0;
-                long val = strtol(ptr, &endptr, 10);
-                if (endptr == ptr || errno != 0) {
-                    printf("Invalid integer input. Please try again.\n");
-                    return 0;
-                }
-                int_val = (int)val;
-                size_t row = read_count / mat->size;
-                size_t col = read_count % mat->size;
-                matrix_set(mat, row, col, &int_val);
-                ptr = endptr;
-                read_count++;
-            } else {
-                errno = 0;
-                double val = strtod(ptr, &endptr);
-                if (endptr == ptr || errno != 0) {
-                    printf("Invalid floating-point input. Please try again.\n");
-                    return 0;
-                }
-                dbl_val = val;
-                size_t row = read_count / mat->size;
-                size_t col = read_count % mat->size;
-                matrix_set(mat, row, col, &dbl_val);
-                ptr = endptr;
-                read_count++;
+    while (1) {
+        printf("Enter %zu numbers separated by spaces or newlines:\n", total);
+        size_t count = 0;
+        int ok = 1;
+        while (count < total) {
+            char buffer[4096];
+            if (!fgets(buffer, sizeof(buffer), stdin)) {
+                printf("Input error.\n");
+                return 0;
             }
+            char *ptr = buffer;
+            while (count < total && *ptr) {
+                while (*ptr == ' ' || *ptr == '\t' || *ptr == '\n') ptr++;
+                if (*ptr == '\0') break;
+                
+                char *endptr;
+                if (type == 1) {
+                    long val = strtol(ptr, &endptr, 10);
+                    if (endptr == ptr) {
+                        ok = 0;
+                        break;
+                    }
+                    if (*endptr != '\0' && *endptr != ' ' && *endptr != '\t' && *endptr != '\n') {
+                        ok = 0;
+                        break;
+                    }
+                    int iv = (int)val;
+                    size_t row = count / mat->size;
+                    size_t col = count % mat->size;
+                    matrix_set(mat, row, col, &iv);
+                    ptr = endptr;
+                    count++;
+                } else {
+                    double val = strtod(ptr, &endptr);
+                    if (endptr == ptr) {
+                        ok = 0;
+                        break;
+                    }
+                    if (*endptr != '\0' && *endptr != ' ' && *endptr != '\t' && *endptr != '\n') {
+                        ok = 0;
+                        break;
+                    }
+                    size_t row = count / mat->size;
+                    size_t col = count % mat->size;
+                    matrix_set(mat, row, col, &val);
+                    ptr = endptr;
+                    count++;
+                }
+            }
+            if (!ok) break;
         }
+        if (ok && count == total) return 1;
+        printf("Invalid input. Please enter all %zu numbers again.\n", total);
     }
-    return 1;
 }
 
 static matrix_t* create_matrix_interactive()
@@ -175,46 +194,6 @@ static matrix_t* create_matrix_interactive()
     return mat;
 }
 
-static void print_matrix_aligned(const matrix_t *m)
-{
-    if (!m) return;
-    size_t max_width = 0;
-    char buffer[256];
-    for (size_t i = 0; i < m->size; i++) {
-        for (size_t j = 0; j < m->size; j++) {
-            void *elem = matrix_get(m, i, j);
-            if (!elem) return;
-            FILE *devnull = fopen("/dev/null", "w");
-            if (!devnull) devnull = fopen("nul", "w");
-            FILE *old_stdout = stdout;
-            stdout = devnull;
-            m->field_info->print(elem);
-            fflush(devnull);
-            long pos = ftell(devnull);
-            if (pos > 0 && pos < sizeof(buffer)) {
-                fseek(devnull, 0, SEEK_SET);
-                fread(buffer, 1, pos, devnull);
-                buffer[pos] = '\0';
-                size_t len = strlen(buffer);
-                if (len > max_width) max_width = len;
-            }
-            fclose(devnull);
-            stdout = old_stdout;
-        }
-    }
-    if (max_width < 4) max_width = 4;
-    max_width++;
-
-    for (size_t i = 0; i < m->size; i++) {
-        for (size_t j = 0; j < m->size; j++) {
-            void *elem = matrix_get(m, i, j);
-            m->field_info->print(elem);
-            printf("%*s", (int)(max_width - 1), "");
-        }
-        printf("\n");
-    }
-}
-
 static void print_menu()
 {
     printf("\n=== Matrix Operations ===\n");
@@ -231,6 +210,32 @@ static void print_menu()
     printf("Choice: ");
 }
 
+static int read_menu_choice()
+{
+    char buf[32];
+    while (1) {
+        print_menu();
+        if (!fgets(buf, sizeof(buf), stdin))
+            return -1;
+        buf[strcspn(buf, "\n")] = '\0';
+        char *endptr;
+        long val = strtol(buf, &endptr, 10);
+        if (endptr == buf || *endptr != '\0') {
+            printf("Invalid input. Please enter a number between 0 and 9.\n");
+            wait_for_enter();
+            clear_screen();
+            continue;
+        }
+        if (val < 0 || val > 9) {
+            printf("Choice must be between 0 and 9.\n");
+            wait_for_enter();
+            clear_screen();
+            continue;
+        }
+        return (int)val;
+    }
+}
+
 static int add_matrix(matrix_t *m)
 {
     for (int i = 0; i < MAX_MATRICES; i++) {
@@ -244,15 +249,15 @@ static int add_matrix(matrix_t *m)
 
 static matrix_t* get_matrix_by_id(const char *prompt)
 {
-    show_available_matrices();
-    int id;
-    if (!read_int_range(prompt, 0, MAX_MATRICES-1, &id))
-        return NULL;
-    if (!matrices[id]) {
-        printf("Matrix ID %d does not exist.\n", id);
-        return NULL;
+    while (1) {
+        show_available_matrices();
+        int id;
+        if (!read_int_range(prompt, 0, MAX_MATRICES-1, &id))
+            continue;
+        if (matrices[id])
+            return matrices[id];
+        printf("Matrix ID %d does not exist. Please try again.\n", id);
     }
-    return matrices[id];
 }
 
 int main()
@@ -260,13 +265,9 @@ int main()
     int choice;
     while (1) {
         clear_screen();
-        print_menu();
-        char buf[10];
-        if (!fgets(buf, sizeof(buf), stdin)) break;
-        if (buf[0] == '\n') continue;
-        choice = atoi(buf);
-
-        if (choice == 0) break;
+        choice = read_menu_choice();
+        if (choice == -1 || choice == 0)
+            break;
 
         clear_screen();
 
@@ -283,40 +284,29 @@ int main()
             }
             case 2: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
                 matrix_t *m = get_matrix_by_id("Enter matrix ID to print: ");
-                if (m) {
-                    printf("Matrix:\n");
-                    print_matrix_aligned(m);
-                } else {
-                    wait_for_enter();
-                }
+                printf("Matrix:\n");
+                matrix_print(m);
+                wait_for_enter();
                 break;
             }
             case 3: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
                 matrix_t *a = get_matrix_by_id("Matrix A ID: ");
-                if (!a) {
-                    wait_for_enter();
-                    break;
-                }
                 matrix_t *b = get_matrix_by_id("Matrix B ID: ");
-                if (!b) {
-                    wait_for_enter();
-                    break;
-                }
                 matrix_t *res = matrix_add(a, b);
                 if (res) {
                     int id = add_matrix(res);
                     printf("Result matrix ID: %d\n", id);
-                    print_matrix_aligned(res);
+                    matrix_print(res);
                 } else {
                     printf("Addition failed.\n");
                 }
@@ -325,25 +315,17 @@ int main()
             }
             case 4: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
                 matrix_t *a = get_matrix_by_id("Matrix A ID: ");
-                if (!a) {
-                    wait_for_enter();
-                    break;
-                }
                 matrix_t *b = get_matrix_by_id("Matrix B ID: ");
-                if (!b) {
-                    wait_for_enter();
-                    break;
-                }
                 matrix_t *res = matrix_multiply(a, b);
                 if (res) {
                     int id = add_matrix(res);
                     printf("Result matrix ID: %d\n", id);
-                    print_matrix_aligned(res);
+                    matrix_print(res);
                 } else {
                     printf("Multiplication failed.\n");
                 }
@@ -352,68 +334,51 @@ int main()
             }
             case 5: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
                 matrix_t *m = get_matrix_by_id("Matrix ID: ");
-                if (!m) {
-                    wait_for_enter();
-                    break;
-                }
                 if (m->field_info->elem_size == sizeof(int)) {
                     int scalar;
-                    if (!read_int_range("Enter integer scalar: ", -1000000, 1000000, &scalar)) {
-                        wait_for_enter();
+                    if (!read_int_range("Enter integer scalar: ", -1000000, 1000000, &scalar))
                         break;
-                    }
                     matrix_t *res = matrix_scalar_mul(m, &scalar);
                     if (res) {
                         int id = add_matrix(res);
                         printf("Scaled matrix ID: %d\n", id);
-                        print_matrix_aligned(res);
-                    } else {
-                        printf("Scalar multiplication failed.\n");
-                    }
+                        matrix_print(res);
+                    } else printf("Scalar multiplication failed.\n");
                 } else {
                     double scalar;
-                    if (!read_double_range("Enter double scalar: ", &scalar)) {
-                        wait_for_enter();
+                    if (!read_double_range("Enter double scalar: ", &scalar))
                         break;
-                    }
                     matrix_t *res = matrix_scalar_mul(m, &scalar);
                     if (res) {
                         int id = add_matrix(res);
                         printf("Scaled matrix ID: %d\n", id);
-                        print_matrix_aligned(res);
-                    } else {
-                        printf("Scalar multiplication failed.\n");
-                    }
+                        matrix_print(res);
+                    } else printf("Scalar multiplication failed.\n");
                 }
                 wait_for_enter();
                 break;
             }
             case 6: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
                 matrix_t *src = get_matrix_by_id("Source matrix ID: ");
-                if (!src) {
-                    wait_for_enter();
-                    break;
-                }
+                printf("\nCurrent matrix:\n");
+                matrix_print(src);
+                printf("\n");
                 size_t target_row;
-                if (!read_size_range("Target row index (0..n-1): ", &target_row, 0, src->size-1)) {
-                    wait_for_enter();
+                if (!read_size_range("Target row index (0..n-1): ", &target_row, 0, src->size-1))
                     break;
-                }
                 size_t count;
-                if (!read_size_range("Number of source rows: ", &count, 1, src->size)) {
-                    wait_for_enter();
+                if (!read_size_range("Number of source rows: ", &count, 1, src->size))
                     break;
-                }
                 size_t *rows = malloc(count * sizeof(size_t));
                 if (!rows) {
                     printf("Memory error.\n");
@@ -470,7 +435,7 @@ int main()
                 if (res) {
                     int id = add_matrix(res);
                     printf("Result matrix ID: %d\n", id);
-                    print_matrix_aligned(res);
+                    matrix_print(res);
                 } else {
                     printf("Linear combination failed.\n");
                 }
@@ -481,42 +446,41 @@ int main()
             }
             case 7: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
                 printf("Stored matrices:\n");
-                int any = 0;
                 for (int i = 0; i < MAX_MATRICES; i++) {
                     if (matrices[i]) {
                         printf("ID %d:\n", i);
-                        print_matrix_aligned(matrices[i]);
+                        matrix_print(matrices[i]);
                         printf("\n");
-                        any = 1;
                     }
                 }
-                if (!any) printf("No matrices stored.\n");
                 wait_for_enter();
                 break;
             }
             case 8: {
                 if (!any_matrix_exists()) {
-                    printf("No matrices exist. Please create a matrix first.\n");
+                    printf("No matrices exist.\n");
                     wait_for_enter();
                     break;
                 }
-                show_available_matrices();
-                int id;
-                if (!read_int_range("Matrix ID to free: ", 0, MAX_MATRICES-1, &id)) {
-                    wait_for_enter();
-                    break;
-                }
-                if (matrices[id]) {
-                    matrix_free(matrices[id]);
-                    matrices[id] = NULL;
-                    printf("Freed.\n");
-                } else {
-                    printf("Matrix ID %d does not exist.\n", id);
+                while (1) {
+                    show_available_matrices();
+                    int id;
+                    if (!read_int_range("Matrix ID to free (or -1 to cancel): ", -1, MAX_MATRICES-1, &id))
+                        continue;
+                    if (id == -1) break;
+                    if (matrices[id]) {
+                        matrix_free(matrices[id]);
+                        matrices[id] = NULL;
+                        printf("Freed.\n");
+                        break;
+                    } else {
+                        printf("Matrix ID %d does not exist. Try again.\n", id);
+                    }
                 }
                 wait_for_enter();
                 break;
